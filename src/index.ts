@@ -77,6 +77,398 @@ export class MyMCP extends McpAgent {
 				}
 			}
 		);
+
+		// 天氣查詢工具
+		this.server.tool(
+			"getWeather",
+			{
+				city: z.string().describe("城市名稱（中文或英文）"),
+				country: z.string().optional().describe("國家代碼（例如：TW, US, JP）"),
+				units: z.enum(["metric", "imperial", "kelvin"]).optional().describe("溫度單位（公制/英制/開爾文）")
+			},
+			async ({ city, country, units = "metric" }) => {
+				try {
+					// 使用免費的 wttr.in API
+					const location = country ? `${city},${country}` : city;
+					const response = await fetch(`https://wttr.in/${encodeURIComponent(location)}?format=j1`);
+					
+					if (!response.ok) {
+						return {
+							content: [{
+								type: "text",
+								text: `❌ 無法獲取 ${city} 的天氣資訊。請確認城市名稱是否正確。`
+							}]
+						};
+					}
+
+					const data = await response.json();
+					const current = data.current_condition[0];
+					const today = data.weather[0];
+					
+					const temp = units === "imperial" ? 
+						Math.round((parseFloat(current.temp_C) * 9/5) + 32) + "°F" :
+						units === "kelvin" ?
+						Math.round(parseFloat(current.temp_C) + 273.15) + "K" :
+						current.temp_C + "°C";
+
+					return {
+						content: [{
+							type: "text",
+							text: `🌤️ **${city} 天氣資訊**\n\n` +
+								  `🌡️ **目前溫度**：${temp}\n` +
+								  `🌦️ **天氣狀況**：${current.weatherDesc[0].value}\n` +
+								  `💨 **風速**：${current.windspeedKmph} km/h\n` +
+								  `💧 **濕度**：${current.humidity}%\n` +
+								  `👁️ **能見度**：${current.visibility} km\n` +
+								  `🌅 **日出時間**：${today.astronomy[0].sunrise}\n` +
+								  `🌇 **日落時間**：${today.astronomy[0].sunset}\n\n` +
+								  `📊 **今日溫度範圍**：${today.mintempC}°C ~ ${today.maxtempC}°C`
+						}]
+					};
+				} catch (error) {
+					return {
+						content: [{
+							type: "text",
+							text: `❌ 天氣查詢失敗：${error instanceof Error ? error.message : '未知錯誤'}`
+						}]
+					};
+				}
+			}
+		);
+
+		// 新聞查詢工具
+		this.server.tool(
+			"getNews",
+			{
+				topic: z.string().describe("新聞主題或關鍵字"),
+				category: z.enum(["general", "business", "technology", "science", "health", "sports", "entertainment"]).optional().describe("新聞分類"),
+				limit: z.number().min(1).max(10).optional().describe("返回新聞數量（1-10）")
+			},
+			async ({ topic, category = "general", limit = 5 }) => {
+				try {
+					// 使用免費的 NewsAPI (公開端點)
+					const apiUrl = `https://newsapi.org/v2/everything?q=${encodeURIComponent(topic)}&sortBy=publishedAt&pageSize=${limit}&language=zh`;
+					
+					// 由於 NewsAPI 需要 API 金鑰，我們使用替代方案 - 模擬新聞數據
+					const mockNews = [
+						{
+							title: `${topic} 相關新聞：最新發展報導`,
+							description: `關於 ${topic} 的最新動態與深度分析...`,
+							url: "https://example.com/news1",
+							publishedAt: new Date().toISOString(),
+							source: { name: "科技新聞網" }
+						},
+						{
+							title: `${topic} 市場趨勢分析`,
+							description: `專家解讀 ${topic} 對市場的影響與未來展望...`,
+							url: "https://example.com/news2", 
+							publishedAt: new Date(Date.now() - 3600000).toISOString(),
+							source: { name: "財經日報" }
+						}
+					];
+
+					let newsText = `📰 **${topic} 相關新聞** (${category} 分類)\n\n`;
+					
+					mockNews.slice(0, limit).forEach((article, index) => {
+						newsText += `**${index + 1}. ${article.title}**\n`;
+						newsText += `📝 ${article.description}\n`;
+						newsText += `🏢 來源：${article.source.name}\n`;
+						newsText += `⏰ 發布時間：${new Date(article.publishedAt).toLocaleString('zh-TW')}\n`;
+						newsText += `🔗 連結：${article.url}\n\n`;
+					});
+
+					return {
+						content: [{
+							type: "text",
+							text: newsText + `💡 提示：這是模擬新聞數據。實際使用時請配置真實的新聞 API。`
+						}]
+					};
+				} catch (error) {
+					return {
+						content: [{
+							type: "text",
+							text: `❌ 新聞查詢失敗：${error instanceof Error ? error.message : '未知錯誤'}`
+						}]
+					};
+				}
+			}
+		);
+
+		// 加密貨幣價格查詢工具
+		this.server.tool(
+			"getCryptoPrice",
+			{
+				symbol: z.string().describe("加密貨幣代號（例如：bitcoin, ethereum, dogecoin）"),
+				currency: z.string().optional().describe("法定貨幣（例如：usd, twd, eur）")
+			},
+			async ({ symbol, currency = "usd" }) => {
+				try {
+					// 使用免費的 CoinGecko API
+					const apiUrl = `https://api.coingecko.com/api/v3/simple/price?ids=${symbol.toLowerCase()}&vs_currencies=${currency}&include_24hr_change=true&include_market_cap=true`;
+					const response = await fetch(apiUrl);
+					
+					if (!response.ok) {
+						return {
+							content: [{
+								type: "text",
+								text: `❌ 無法獲取 ${symbol} 的價格資訊。請確認貨幣代號是否正確。`
+							}]
+						};
+					}
+
+					const data = await response.json();
+					const coinData = data[symbol.toLowerCase()];
+					
+					if (!coinData) {
+						return {
+							content: [{
+								type: "text",
+								text: `❌ 找不到 ${symbol} 的資訊。請使用正確的貨幣 ID（例如：bitcoin, ethereum）。`
+							}]
+						};
+					}
+
+					const price = coinData[currency];
+					const change24h = coinData[`${currency}_24h_change`];
+					const marketCap = coinData[`${currency}_market_cap`];
+					
+					const changeEmoji = change24h > 0 ? "📈" : change24h < 0 ? "📉" : "➡️";
+					const changeColor = change24h > 0 ? "🟢" : change24h < 0 ? "🔴" : "⚪";
+
+					return {
+						content: [{
+							type: "text",
+							text: `💰 **${symbol.toUpperCase()} 價格資訊**\n\n` +
+								  `💵 **目前價格**：${price.toLocaleString()} ${currency.toUpperCase()}\n` +
+								  `${changeEmoji} **24小時變化**：${changeColor} ${change24h?.toFixed(2) || 0}%\n` +
+								  `📊 **市值**：${marketCap ? marketCap.toLocaleString() : 'N/A'} ${currency.toUpperCase()}\n` +
+								  `⏰ **更新時間**：${new Date().toLocaleString('zh-TW')}\n\n` +
+								  `🔍 數據來源：CoinGecko API`
+						}]
+					};
+				} catch (error) {
+					return {
+						content: [{
+							type: "text",
+							text: `❌ 加密貨幣價格查詢失敗：${error instanceof Error ? error.message : '未知錯誤'}`
+						}]
+					};
+				}
+			}
+		);
+
+		// 單位轉換工具
+		this.server.tool(
+			"convertUnits",
+			{
+				value: z.number().describe("要轉換的數值"),
+				fromUnit: z.string().describe("原始單位"),
+				toUnit: z.string().describe("目標單位"),
+				category: z.enum(["length", "weight", "temperature", "volume", "area", "speed"]).optional().describe("單位類別")
+			},
+			async ({ value, fromUnit, toUnit, category }) => {
+				try {
+					const result = this.performUnitConversion(value, fromUnit, toUnit);
+					
+					return {
+						content: [{
+							type: "text",
+							text: `🔄 **單位轉換結果**\n\n` +
+								  `📏 **原始值**：${value} ${fromUnit}\n` +
+								  `📐 **轉換結果**：${result.value.toFixed(4)} ${toUnit}\n` +
+								  `📊 **轉換係數**：1 ${fromUnit} = ${result.factor} ${toUnit}\n` +
+								  `🏷️ **類別**：${result.category}\n\n` +
+								  `💡 支援的轉換類別：長度、重量、溫度、體積、面積、速度`
+						}]
+					};
+				} catch (error) {
+					return {
+						content: [{
+							type: "text",
+							text: `❌ 單位轉換失敗：${error instanceof Error ? error.message : '未知錯誤'}\n\n` +
+								  `💡 請確認單位名稱是否正確。支援的單位包括：\n` +
+								  `📏 長度：m, cm, mm, km, inch, ft, yard, mile\n` +
+								  `⚖️ 重量：kg, g, lb, oz, ton\n` +
+								  `🌡️ 溫度：celsius, fahrenheit, kelvin\n` +
+								  `🥤 體積：liter, ml, gallon, cup\n` +
+								  `📐 面積：sqm, sqft, acre\n` +
+								  `🚗 速度：kmh, mph, ms`
+						}]
+					};
+				}
+			}
+		);
+
+		// 待辦事項工具
+		this.server.tool(
+			"addTodo",
+			{
+				title: z.string().describe("待辦事項標題"),
+				description: z.string().optional().describe("詳細描述"),
+				priority: z.enum(["low", "medium", "high", "urgent"]).optional().describe("優先級"),
+				dueDate: z.string().optional().describe("截止日期（YYYY-MM-DD）"),
+				category: z.string().optional().describe("分類標籤")
+			},
+			async ({ title, description, priority = "medium", dueDate, category }) => {
+				try {
+					const todoId = Math.random().toString(36).substr(2, 9);
+					const createdAt = new Date().toLocaleString('zh-TW');
+					
+					const priorityEmoji = {
+						low: "🟢",
+						medium: "🟡", 
+						high: "🟠",
+						urgent: "🔴"
+					}[priority];
+
+					return {
+						content: [{
+							type: "text",
+							text: `✅ **待辦事項已建立**\n\n` +
+								  `📋 **標題**：${title}\n` +
+								  `📝 **描述**：${description || '無'}\n` +
+								  `${priorityEmoji} **優先級**：${priority.toUpperCase()}\n` +
+								  `📅 **截止日期**：${dueDate || '未設定'}\n` +
+								  `🏷️ **分類**：${category || '一般'}\n` +
+								  `🆔 **任務ID**：${todoId}\n` +
+								  `⏰ **建立時間**：${createdAt}\n\n` +
+								  `💡 提示：這是模擬的待辦事項功能。實際使用時可整合 Todist、Notion 等服務。`
+						}]
+					};
+				} catch (error) {
+					return {
+						content: [{
+							type: "text",
+							text: `❌ 建立待辦事項失敗：${error instanceof Error ? error.message : '未知錯誤'}`
+						}]
+					};
+				}
+			}
+		);
+
+		// 日曆事件工具  
+		this.server.tool(
+			"createEvent",
+			{
+				title: z.string().describe("事件標題"),
+				startTime: z.string().describe("開始時間（YYYY-MM-DD HH:MM）"),
+				endTime: z.string().describe("結束時間（YYYY-MM-DD HH:MM）"),
+				description: z.string().optional().describe("事件描述"),
+				location: z.string().optional().describe("地點"),
+				attendees: z.array(z.string()).optional().describe("參與者email列表")
+			},
+			async ({ title, startTime, endTime, description, location, attendees }) => {
+				try {
+					const eventId = Math.random().toString(36).substr(2, 9);
+					const createdAt = new Date().toLocaleString('zh-TW');
+					
+					return {
+						content: [{
+							type: "text",
+							text: `📅 **日曆事件已建立**\n\n` +
+								  `📋 **標題**：${title}\n` +
+								  `⏰ **開始時間**：${startTime}\n` +
+								  `⏱️ **結束時間**：${endTime}\n` +
+								  `📝 **描述**：${description || '無'}\n` +
+								  `📍 **地點**：${location || '未指定'}\n` +
+								  `👥 **參與者**：${attendees?.join(', ') || '無'}\n` +
+								  `🆔 **事件ID**：${eventId}\n` +
+								  `⏰ **建立時間**：${createdAt}\n\n` +
+								  `💡 提示：這是模擬的日曆功能。實際使用時可整合 Google Calendar、Outlook 等服務。`
+						}]
+					};
+				} catch (error) {
+					return {
+						content: [{
+							type: "text",
+							text: `❌ 建立日曆事件失敗：${error instanceof Error ? error.message : '未知錯誤'}`
+						}]
+					};
+				}
+			}
+		);
+
+		// 技術文件搜尋工具
+		this.server.tool(
+			"searchDocs",
+			{
+				query: z.string().describe("搜尋關鍵字"),
+				source: z.enum(["mdn", "npm", "github", "stackoverflow"]).describe("文件來源"),
+				language: z.string().optional().describe("程式語言（用於過濾結果）")
+			},  
+			async ({ query, source, language }) => {
+				try {
+					let searchUrl = "";
+					let results = "";
+
+					switch (source) {
+						case "mdn":
+							searchUrl = `https://developer.mozilla.org/en-US/search?q=${encodeURIComponent(query)}`;
+							results = `🔍 **MDN 搜尋結果**\n\n` +
+									 `📖 **搜尋關鍵字**：${query}\n` +
+									 `🌐 **搜尋連結**：${searchUrl}\n\n` +
+									 `📋 **常見結果類型**：\n` +
+									 `• JavaScript API 文件\n` +
+									 `• CSS 屬性說明\n` +
+									 `• HTML 元素參考\n` +
+									 `• Web API 指南\n\n`;
+							break;
+
+						case "npm":
+							searchUrl = `https://www.npmjs.com/search?q=${encodeURIComponent(query)}`;
+							results = `📦 **NPM 搜尋結果**\n\n` +
+									 `📖 **搜尋套件**：${query}\n` +
+									 `🌐 **搜尋連結**：${searchUrl}\n\n` +
+									 `📋 **搜尋提示**：\n` +
+									 `• 查看套件的週下載量\n` +
+									 `• 檢查最後更新時間\n` +
+									 `• 查看 GitHub 星星數\n` +
+									 `• 閱讀用戶評價和問題\n\n`;
+							break;
+
+						case "github":
+							searchUrl = `https://github.com/search?q=${encodeURIComponent(query)}${language ? `+language:${language}` : ''}`;
+							results = `💻 **GitHub 搜尋結果**\n\n` +
+									 `📖 **搜尋內容**：${query}\n` +
+									 `🔤 **程式語言**：${language || '不限'}\n` +
+									 `🌐 **搜尋連結**：${searchUrl}\n\n` +
+									 `📋 **搜尋範圍**：\n` +
+									 `• 程式碼庫 (Repositories)\n` +
+									 `• 程式碼片段 (Code)\n` +
+									 `• 問題討論 (Issues)\n` +
+									 `• 使用者和組織\n\n`;
+							break;
+
+						case "stackoverflow":
+							searchUrl = `https://stackoverflow.com/search?q=${encodeURIComponent(query)}${language ? `+[${language}]` : ''}`;
+							results = `❓ **Stack Overflow 搜尋結果**\n\n` +
+									 `📖 **搜尋問題**：${query}\n` +
+									 `🏷️ **相關標籤**：${language || '不限'}\n` +
+									 `🌐 **搜尋連結**：${searchUrl}\n\n` +
+									 `📋 **搜尋技巧**：\n` +
+									 `• 查看問題的投票數\n` +
+									 `• 優先查看已接受的答案\n` +
+									 `• 注意答案的時效性\n` +
+									 `• 查看相關問題\n\n`;
+							break;
+					}
+
+					return {
+						content: [{
+							type: "text",
+							text: results + `💡 點擊連結可直接前往搜尋頁面查看詳細結果。`
+						}]
+					};
+				} catch (error) {
+					return {
+						content: [{
+							type: "text",
+							text: `❌ 文件搜尋失敗：${error instanceof Error ? error.message : '未知錯誤'}`
+						}]
+					};
+				}
+			}
+		);
 	}
 
 	private generateFileContent(
