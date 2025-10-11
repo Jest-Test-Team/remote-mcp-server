@@ -883,6 +883,158 @@ coverage/
 				return `src/${fileName}`;
 		}
 	}
+
+	private performUnitConversion(value: number, fromUnit: string, toUnit: string): { value: number; factor: number; category: string } {
+		const conversions: Record<string, { [key: string]: number }> = {
+			// 長度轉換 (基準單位: 公尺)
+			length: {
+				m: 1,
+				meter: 1,
+				cm: 0.01,
+				centimeter: 0.01,
+				mm: 0.001,
+				millimeter: 0.001,
+				km: 1000,
+				kilometer: 1000,
+				inch: 0.0254,
+				in: 0.0254,
+				ft: 0.3048,
+				foot: 0.3048,
+				feet: 0.3048,
+				yard: 0.9144,
+				yd: 0.9144,
+				mile: 1609.344,
+				mi: 1609.344
+			},
+			// 重量轉換 (基準單位: 公斤)
+			weight: {
+				kg: 1,
+				kilogram: 1,
+				g: 0.001,
+				gram: 0.001,
+				lb: 0.453592,
+				pound: 0.453592,
+				oz: 0.0283495,
+				ounce: 0.0283495,
+				ton: 1000,
+				tonne: 1000
+			},
+			// 體積轉換 (基準單位: 公升)
+			volume: {
+				liter: 1,
+				litre: 1,
+				l: 1,
+				ml: 0.001,
+				milliliter: 0.001,
+				gallon: 3.78541,
+				gal: 3.78541,
+				cup: 0.236588,
+				pint: 0.473176,
+				pt: 0.473176,
+				quart: 0.946353,
+				qt: 0.946353
+			},
+			// 面積轉換 (基準單位: 平方公尺)
+			area: {
+				sqm: 1,
+				m2: 1,
+				sqft: 0.092903,
+				ft2: 0.092903,
+				sqin: 0.00064516,
+				in2: 0.00064516,
+				acre: 4046.86,
+				hectare: 10000,
+				ha: 10000
+			},
+			// 速度轉換 (基準單位: 公尺每秒)
+			speed: {
+				ms: 1,
+				mps: 1,
+				kmh: 0.277778,
+				kph: 0.277778,
+				mph: 0.44704,
+				fps: 0.3048,
+				knot: 0.514444,
+				kn: 0.514444
+			}
+		};
+
+		// 溫度轉換需要特殊處理
+		if (this.isTemperatureUnit(fromUnit) || this.isTemperatureUnit(toUnit)) {
+			return this.convertTemperature(value, fromUnit, toUnit);
+		}
+
+		// 找到對應的轉換類別
+		let category = '';
+		let fromFactor = 0;
+		let toFactor = 0;
+
+		for (const [cat, units] of Object.entries(conversions)) {
+			if (units[fromUnit.toLowerCase()] !== undefined && units[toUnit.toLowerCase()] !== undefined) {
+				category = cat;
+				fromFactor = units[fromUnit.toLowerCase()];
+				toFactor = units[toUnit.toLowerCase()];
+				break;
+			}
+		}
+
+		if (category === '') {
+			throw new Error(`不支援從 ${fromUnit} 轉換至 ${toUnit}`);
+		}
+
+		// 執行轉換: 先轉換到基準單位，再轉換到目標單位
+		const baseValue = value * fromFactor;
+		const convertedValue = baseValue / toFactor;
+		const factor = fromFactor / toFactor;
+
+		return {
+			value: convertedValue,
+			factor: factor,
+			category: this.getCategoryName(category)
+		};
+	}
+
+	private isTemperatureUnit(unit: string): boolean {
+		const tempUnits = ['celsius', 'fahrenheit', 'kelvin', 'c', 'f', 'k'];
+		return tempUnits.includes(unit.toLowerCase());
+	}
+
+	private convertTemperature(value: number, fromUnit: string, toUnit: string): { value: number; factor: number; category: string } {
+		const from = fromUnit.toLowerCase();
+		const to = toUnit.toLowerCase();
+		let result = value;
+
+		// 先轉換到攝氏度
+		if (from === 'fahrenheit' || from === 'f') {
+			result = (value - 32) * 5/9;
+		} else if (from === 'kelvin' || from === 'k') {
+			result = value - 273.15;
+		}
+
+		// 再從攝氏度轉換到目標單位
+		if (to === 'fahrenheit' || to === 'f') {
+			result = result * 9/5 + 32;
+		} else if (to === 'kelvin' || to === 'k') {
+			result = result + 273.15;
+		}
+
+		return {
+			value: result,
+			factor: 1, // 溫度轉換沒有簡單的係數
+			category: '溫度'
+		};
+	}
+
+	private getCategoryName(category: string): string {
+		const names: Record<string, string> = {
+			length: '長度',
+			weight: '重量',
+			volume: '體積',
+			area: '面積',
+			speed: '速度'
+		};
+		return names[category] || category;
+	}
 }
 
 // Export the OAuth handler as the default
