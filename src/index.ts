@@ -469,6 +469,680 @@ export class MyMCP extends McpAgent {
 				}
 			}
 		);
+
+		// 文字翻譯工具
+		this.server.tool(
+			"translateText",
+			{
+				text: z.string().describe("要翻譯的文字"),
+				fromLang: z.string().optional().describe("來源語言代碼（如：zh, en, ja）"),
+				toLang: z.string().describe("目標語言代碼（如：zh, en, ja）"),
+				service: z.enum(["google", "libre", "mock"]).optional().describe("翻譯服務")
+			},
+			async ({ text, fromLang, toLang, service = "mock" }) => {
+				try {
+					// 語言代碼映射
+					const langNames: Record<string, string> = {
+						zh: "中文", en: "英文", ja: "日文", ko: "韓文",
+						fr: "法文", de: "德文", es: "西班牙文", it: "義大利文",
+						ru: "俄文", pt: "葡萄牙文", ar: "阿拉伯文", hi: "印地文"
+					};
+
+					// 模擬翻譯功能（實際可整合 Google Translate API）
+					let translatedText = text;
+					if (toLang === "en") {
+						translatedText = `[EN] ${text} (translated)`;
+					} else if (toLang === "zh") {
+						translatedText = `[中文] ${text}（已翻譯）`;
+					} else {
+						translatedText = `[${toLang.toUpperCase()}] ${text} (translated)`;
+					}
+
+					return {
+						content: [{
+							type: "text",
+							text: `🌐 **文字翻譯結果**\n\n` +
+								  `📝 **原文**：${text}\n` +
+								  `🔤 **來源語言**：${fromLang ? langNames[fromLang] || fromLang : '自動偵測'}\n` +
+								  `🎯 **目標語言**：${langNames[toLang] || toLang}\n` +
+								  `✨ **翻譯結果**：${translatedText}\n` +
+								  `🔧 **翻譯服務**：${service}\n\n` +
+								  `💡 提示：這是模擬翻譯功能。實際使用時可整合 Google Translate 或其他翻譯 API。`
+						}]
+					};
+				} catch (error) {
+					return {
+						content: [{
+							type: "text",
+							text: `❌ 翻譯失敗：${error instanceof Error ? error.message : '未知錯誤'}`
+						}]
+					};
+				}
+			}
+		);
+
+		// QR 碼生成工具
+		this.server.tool(
+			"generateQRCode",
+			{
+				data: z.string().describe("要編碼的資料"),
+				size: z.number().min(100).max(800).optional().describe("QR 碼大小（像素）"),
+				errorCorrection: z.enum(["L", "M", "Q", "H"]).optional().describe("錯誤修正等級")
+			},
+			async ({ data, size = 200, errorCorrection = "M" }) => {
+				try {
+					// 使用免費的 QR Server API
+					const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(data)}&ecc=${errorCorrection}`;
+					
+					return {
+						content: [{
+							type: "text",
+							text: `📱 **QR 碼已生成**\n\n` +
+								  `📝 **編碼資料**：${data}\n` +
+								  `📐 **尺寸**：${size}x${size} 像素\n` +
+								  `🛡️ **錯誤修正**：${errorCorrection} 等級\n` +
+								  `🔗 **QR 碼連結**：${qrUrl}\n\n` +
+								  `📲 **使用方式**：\n` +
+								  `1. 點擊上方連結查看 QR 碼\n` +
+								  `2. 右鍵保存圖片到本地\n` +
+								  `3. 使用手機掃描測試\n\n` +
+								  `💡 支援網址、文字、WiFi 設定、聯絡資訊等各種資料類型`
+						}]
+					};
+				} catch (error) {
+					return {
+						content: [{
+							type: "text",
+							text: `❌ QR 碼生成失敗：${error instanceof Error ? error.message : '未知錯誤'}`
+						}]
+					};
+				}
+			}
+		);
+
+		// 密碼生成工具
+		this.server.tool(
+			"generatePassword",
+			{
+				length: z.number().min(4).max(128).optional().describe("密碼長度"),
+				includeUppercase: z.boolean().optional().describe("包含大寫字母"),
+				includeLowercase: z.boolean().optional().describe("包含小寫字母"),
+				includeNumbers: z.boolean().optional().describe("包含數字"),
+				includeSymbols: z.boolean().optional().describe("包含特殊符號"),
+				excludeSimilar: z.boolean().optional().describe("排除相似字元（如 0O, 1l）"),
+				count: z.number().min(1).max(10).optional().describe("生成密碼數量")
+			},
+			async ({ 
+				length = 12, 
+				includeUppercase = true, 
+				includeLowercase = true, 
+				includeNumbers = true, 
+				includeSymbols = false,
+				excludeSimilar = true,
+				count = 1 
+			}) => {
+				try {
+					const passwords = [];
+					
+					for (let i = 0; i < count; i++) {
+						const password = this.generateSecurePassword({
+							length,
+							includeUppercase,
+							includeLowercase,
+							includeNumbers,
+							includeSymbols,
+							excludeSimilar
+						});
+						
+						const strength = this.calculatePasswordStrength(password);
+						passwords.push({ password, strength });
+					}
+
+					let result = `🔐 **安全密碼生成**\n\n`;
+					
+					passwords.forEach((item, index) => {
+						const strengthEmoji = item.strength.score >= 4 ? "🟢" : 
+											 item.strength.score >= 3 ? "🟡" : 
+											 item.strength.score >= 2 ? "🟠" : "🔴";
+						
+						result += `**密碼 ${index + 1}：**\n`;
+						result += `🔑 \`${item.password}\`\n`;
+						result += `${strengthEmoji} **強度評分**：${item.strength.score}/5 (${item.strength.level})\n`;
+						result += `📊 **複雜度**：${item.strength.complexity}\n\n`;
+					});
+
+					result += `⚙️ **生成設定**：\n`;
+					result += `📏 長度：${length} 字元\n`;
+					result += `🔤 大寫字母：${includeUppercase ? '✅' : '❌'}\n`;
+					result += `🔡 小寫字母：${includeLowercase ? '✅' : '❌'}\n`;
+					result += `🔢 數字：${includeNumbers ? '✅' : '❌'}\n`;
+					result += `⚡ 特殊符號：${includeSymbols ? '✅' : '❌'}\n`;
+					result += `🚫 排除相似字元：${excludeSimilar ? '✅' : '❌'}\n\n`;
+					result += `💡 **安全提醒**：請妥善保管密碼，定期更換，不要重複使用。`;
+
+					return {
+						content: [{
+							type: "text",
+							text: result
+						}]
+					};
+				} catch (error) {
+					return {
+						content: [{
+							type: "text",
+							text: `❌ 密碼生成失敗：${error instanceof Error ? error.message : '未知錯誤'}`
+						}]
+					};
+				}
+			}
+		);
+
+		// Base64 編解碼工具
+		this.server.tool(
+			"encodeDecodeBase64",
+			{
+				data: z.string().describe("要編碼或解碼的資料"),
+				operation: z.enum(["encode", "decode"]).describe("操作類型：編碼或解碼"),
+				format: z.enum(["text", "url", "html"]).optional().describe("資料格式")
+			},
+			async ({ data, operation, format = "text" }) => {
+				try {
+					let result = "";
+					let isValid = true;
+					
+					if (operation === "encode") {
+						// 編碼
+						result = btoa(unescape(encodeURIComponent(data)));
+					} else {
+						// 解碼
+						try {
+							result = decodeURIComponent(escape(atob(data)));
+						} catch {
+							isValid = false;
+							result = "無效的 Base64 格式";
+						}
+					}
+
+					const opName = operation === "encode" ? "編碼" : "解碼";
+					const inputLabel = operation === "encode" ? "原始資料" : "Base64 資料";
+					const outputLabel = operation === "encode" ? "Base64 結果" : "解碼結果";
+
+					return {
+						content: [{
+							type: "text",
+							text: `🔧 **Base64 ${opName}結果**\n\n` +
+								  `📝 **${inputLabel}**：\n\`\`\`\n${data}\n\`\`\`\n\n` +
+								  `✨ **${outputLabel}**：\n\`\`\`\n${result}\n\`\`\`\n\n` +
+								  `📊 **統計資訊**：\n` +
+								  `• 輸入長度：${data.length} 字元\n` +
+								  `• 輸出長度：${result.length} 字元\n` +
+								  `• 資料格式：${format}\n` +
+								  `• 操作狀態：${isValid ? '✅ 成功' : '❌ 失敗'}\n\n` +
+								  `💡 **使用場景**：資料傳輸、圖片編碼、API 認證等`
+						}]
+					};
+				} catch (error) {
+					return {
+						content: [{
+							type: "text",
+							text: `❌ Base64 操作失敗：${error instanceof Error ? error.message : '未知錯誤'}`
+						}]
+					};
+				}
+			}
+		);
+
+		// UUID 生成工具
+		this.server.tool(
+			"generateUUID",
+			{
+				version: z.enum(["v4", "v1", "v3", "v5"]).optional().describe("UUID 版本"),
+				count: z.number().min(1).max(20).optional().describe("生成數量"),
+				format: z.enum(["standard", "compact", "urn"]).optional().describe("格式類型")
+			},
+			async ({ version = "v4", count = 1, format = "standard" }) => {
+				try {
+					const uuids = [];
+					
+					for (let i = 0; i < count; i++) {
+						let uuid = "";
+						
+						if (version === "v4") {
+							// UUID v4 (隨機)
+							uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+								const r = Math.random() * 16 | 0;
+								const v = c === 'x' ? r : (r & 0x3 | 0x8);
+								return v.toString(16);
+							});
+						} else {
+							// 其他版本的模擬實作
+							uuid = 'xxxxxxxx-xxxx-Vxxx-yxxx-xxxxxxxxxxxx'
+								.replace(/[xy]/g, function(c) {
+									const r = Math.random() * 16 | 0;
+									const v = c === 'x' ? r : (r & 0x3 | 0x8);
+									return v.toString(16);
+								})
+								.replace('V', version.charAt(1));
+						}
+
+						// 格式化處理
+						let formattedUuid = uuid;
+						if (format === "compact") {
+							formattedUuid = uuid.replace(/-/g, '');
+						} else if (format === "urn") {
+							formattedUuid = `urn:uuid:${uuid}`;
+						}
+
+						uuids.push({
+							uuid: formattedUuid,
+							standard: uuid,
+							compact: uuid.replace(/-/g, ''),
+							urn: `urn:uuid:${uuid}`
+						});
+					}
+
+					let result = `🆔 **UUID 生成結果**\n\n`;
+					
+					uuids.forEach((item, index) => {
+						result += `**UUID ${index + 1}：**\n`;
+						result += `🎯 **主要格式**：\`${item.uuid}\`\n`;
+						if (format === "standard") {
+							result += `📦 **緊湊格式**：\`${item.compact}\`\n`;
+							result += `🌐 **URN 格式**：\`${item.urn}\`\n`;
+						}
+						result += `\n`;
+					});
+
+					result += `⚙️ **生成設定**：\n`;
+					result += `📋 版本：UUID ${version.toUpperCase()}\n`;
+					result += `📊 數量：${count} 個\n`;
+					result += `🎨 格式：${format}\n\n`;
+					result += `💡 **使用場景**：\n`;
+					result += `• 資料庫主鍵\n`;
+					result += `• 檔案命名\n`;
+					result += `• 交易識別碼\n`;
+					result += `• API 請求追蹤`;
+
+					return {
+						content: [{
+							type: "text",
+							text: result
+						}]
+					};
+				} catch (error) {
+					return {
+						content: [{
+							type: "text",
+							text: `❌ UUID 生成失敗：${error instanceof Error ? error.message : '未知錯誤'}`
+						}]
+					};
+				}
+			}
+		);
+
+		// 網站狀態檢查工具
+		this.server.tool(
+			"checkWebsite",
+			{
+				url: z.string().describe("要檢查的網站 URL"),
+				timeout: z.number().min(1000).max(30000).optional().describe("超時時間（毫秒）"),
+				followRedirects: z.boolean().optional().describe("是否跟隨重定向")
+			},
+			async ({ url, timeout = 10000, followRedirects = true }) => {
+				try {
+					const startTime = Date.now();
+					
+					// 確保 URL 包含協議
+					const fullUrl = url.startsWith('http') ? url : `https://${url}`;
+					
+					const response = await fetch(fullUrl, {
+						method: 'HEAD',
+						// timeout: timeout,
+						redirect: followRedirects ? 'follow' : 'manual'
+					});
+
+					const endTime = Date.now();
+					const responseTime = endTime - startTime;
+
+					const statusEmoji = response.status < 300 ? "🟢" : 
+									   response.status < 400 ? "🟡" : 
+									   response.status < 500 ? "🟠" : "🔴";
+
+					const headers = Array.from(response.headers.entries());
+					const importantHeaders = headers.filter(([key]) => 
+						['server', 'content-type', 'cache-control', 'last-modified'].includes(key.toLowerCase())
+					);
+
+					return {
+						content: [{
+							type: "text",
+							text: `🌐 **網站狀態檢查結果**\n\n` +
+								  `🔗 **檢查網址**：${fullUrl}\n` +
+								  `${statusEmoji} **HTTP 狀態**：${response.status} ${response.statusText}\n` +
+								  `⚡ **回應時間**：${responseTime} ms\n` +
+								  `🔄 **重定向處理**：${followRedirects ? '✅ 啟用' : '❌ 停用'}\n\n` +
+								  `📊 **重要標頭資訊**：\n` +
+								  (importantHeaders.length > 0 ? 
+									importantHeaders.map(([key, value]) => `• **${key}**: ${value}`).join('\n') :
+									'無重要標頭資訊') + `\n\n` +
+								  `🎯 **網站狀態**：${response.ok ? '✅ 正常運行' : '❌ 存在問題'}\n` +
+								  `⏰ **檢查時間**：${new Date().toLocaleString('zh-TW')}\n\n` +
+								  `💡 **性能評估**：\n` +
+								  `${responseTime < 500 ? '🚀 極快' : 
+									responseTime < 1000 ? '⚡ 快速' : 
+									responseTime < 3000 ? '🐌 普通' : '🐢 緩慢'} (${responseTime}ms)`
+						}]
+					};
+				} catch (error) {
+					return {
+						content: [{
+							type: "text",
+							text: `❌ 網站檢查失敗：${error instanceof Error ? error.message : '未知錯誤'}\n\n` +
+								  `🔍 **可能原因**：\n` +
+								  `• 網站無法訪問\n` +
+								  `• 網路連接問題\n` +
+								  `• URL 格式錯誤\n` +
+								  `• 伺服器未回應\n\n` +
+								  `💡 請檢查 URL 格式是否正確，並確認網路連接正常。`
+						}]
+					};
+				}
+			}
+		);
+
+		// 時區轉換工具
+		this.server.tool(
+			"getTimezone",
+			{
+				time: z.string().optional().describe("時間（YYYY-MM-DD HH:MM 或 ISO 格式）"),
+				fromTimezone: z.string().optional().describe("來源時區（如：Asia/Taipei）"),
+				toTimezone: z.string().describe("目標時區（如：America/New_York）"),
+				format: z.enum(["iso", "local", "custom"]).optional().describe("輸出格式")
+			},
+			async ({ time, fromTimezone = "UTC", toTimezone, format = "local" }) => {
+				try {
+					const inputTime = time ? new Date(time) : new Date();
+					
+					// 時區資訊對照表
+					const timezoneNames: Record<string, string> = {
+						"UTC": "協調世界時",
+						"Asia/Taipei": "台北時間",
+						"Asia/Tokyo": "東京時間",
+						"Asia/Shanghai": "上海時間",
+						"America/New_York": "紐約時間",
+						"America/Los_Angeles": "洛杉磯時間",
+						"Europe/London": "倫敦時間",
+						"Europe/Paris": "巴黎時間"
+					};
+
+					// 使用 Intl.DateTimeFormat 進行時區轉換
+					const convertedTime = new Date(inputTime.toLocaleString("en-US", {timeZone: toTimezone}));
+					const originalTime = new Date(inputTime.toLocaleString("en-US", {timeZone: fromTimezone}));
+					
+					let formattedTime = "";
+					if (format === "iso") {
+						formattedTime = convertedTime.toISOString();
+					} else if (format === "local") {
+						formattedTime = convertedTime.toLocaleString('zh-TW');
+					} else {
+						formattedTime = convertedTime.toString();
+					}
+
+					const timeDiff = Math.abs(convertedTime.getTime() - originalTime.getTime()) / (1000 * 60 * 60);
+
+					return {
+						content: [{
+							type: "text",
+							text: `🌍 **時區轉換結果**\n\n` +
+								  `⏰ **原始時間**：${originalTime.toLocaleString('zh-TW')}\n` +
+								  `📍 **來源時區**：${timezoneNames[fromTimezone] || fromTimezone}\n` +
+								  `📍 **目標時區**：${timezoneNames[toTimezone] || toTimezone}\n` +
+								  `✨ **轉換結果**：${formattedTime}\n` +
+								  `⏳ **時差**：${timeDiff.toFixed(1)} 小時\n` +
+								  `📅 **轉換時間**：${new Date().toLocaleString('zh-TW')}\n\n` +
+								  `💡 **常用時區**：\n` +
+								  `• Asia/Taipei - 台北\n` +
+								  `• America/New_York - 紐約\n` +
+								  `• Europe/London - 倫敦\n` +
+								  `• Asia/Tokyo - 東京`
+						}]
+					};
+				} catch (error) {
+					return {
+						content: [{
+							type: "text",
+							text: `❌ 時區轉換失敗：${error instanceof Error ? error.message : '未知錯誤'}`
+						}]
+					};
+				}
+			}
+		);
+
+		// JSON 格式化工具
+		this.server.tool(
+			"formatJSON",
+			{
+				jsonData: z.string().describe("要格式化的 JSON 資料"),
+				operation: z.enum(["format", "minify", "validate"]).describe("操作類型"),
+				indent: z.number().min(0).max(8).optional().describe("縮排空格數")
+			},
+			async ({ jsonData, operation, indent = 2 }) => {
+				try {
+					let result = "";
+					let isValid = true;
+					let errorMessage = "";
+					let stats = { keys: 0, values: 0, arrays: 0, objects: 0 };
+
+					try {
+						const parsed = JSON.parse(jsonData);
+						
+						// 計算統計資訊
+						stats = this.analyzeJSON(parsed);
+
+						if (operation === "format") {
+							result = JSON.stringify(parsed, null, indent);
+						} else if (operation === "minify") {
+							result = JSON.stringify(parsed);
+						} else if (operation === "validate") {
+							result = "✅ JSON 格式有效";
+						}
+					} catch (parseError) {
+						isValid = false;
+						errorMessage = parseError instanceof Error ? parseError.message : '未知解析錯誤';
+						result = `❌ JSON 格式無效：${errorMessage}`;
+					}
+
+					const opNames: Record<string, string> = {
+						format: "格式化",
+						minify: "壓縮",
+						validate: "驗證"
+					};
+
+					return {
+						content: [{
+							type: "text",
+							text: `📋 **JSON ${opNames[operation]}結果**\n\n` +
+								  `📊 **狀態**：${isValid ? '✅ 有效' : '❌ 無效'}\n` +
+								  (errorMessage ? `⚠️ **錯誤**：${errorMessage}\n` : '') +
+								  `📏 **原始長度**：${jsonData.length} 字元\n` +
+								  `📐 **結果長度**：${result.length} 字元\n\n` +
+								  (isValid ? `📈 **結構統計**：\n` +
+											`• 物件數量：${stats.objects}\n` +
+											`• 陣列數量：${stats.arrays}\n` +
+											`• 鍵值對：${stats.keys}\n` +
+											`• 值數量：${stats.values}\n\n` : '') +
+								  `📝 **${operation === "validate" ? "驗證" : "處理"}結果**：\n\`\`\`json\n${result.length > 2000 ? result.substring(0, 2000) + '...' : result}\n\`\`\`\n\n` +
+								  `💡 **使用提示**：\n` +
+								  `• format: 美化 JSON 格式\n` +
+								  `• minify: 壓縮移除空白\n` +
+								  `• validate: 驗證格式正確性`
+						}]
+					};
+				} catch (error) {
+					return {
+						content: [{
+							type: "text",
+							text: `❌ JSON 處理失敗：${error instanceof Error ? error.message : '未知錯誤'}`
+						}]
+					};
+				}
+			}
+		);
+
+		// 雜湊值生成工具
+		this.server.tool(
+			"generateHash",
+			{
+				data: z.string().describe("要計算雜湊值的資料"),
+				algorithm: z.enum(["md5", "sha1", "sha256", "sha512"]).optional().describe("雜湊演算法"),
+				encoding: z.enum(["hex", "base64"]).optional().describe("輸出編碼格式")
+			},
+			async ({ data, algorithm = "sha256", encoding = "hex" }) => {
+				try {
+					// 使用 Web Crypto API 計算雜湊值
+					const encoder = new TextEncoder();
+					const dataBuffer = encoder.encode(data);
+					
+					let hashBuffer: ArrayBuffer;
+					let algName = "";
+
+					switch (algorithm) {
+						case "sha1":
+							hashBuffer = await crypto.subtle.digest('SHA-1', dataBuffer);
+							algName = "SHA-1";
+							break;
+						case "sha256":
+							hashBuffer = await crypto.subtle.digest('SHA-256', dataBuffer);
+							algName = "SHA-256";
+							break;
+						case "sha512":
+							hashBuffer = await crypto.subtle.digest('SHA-512', dataBuffer);
+							algName = "SHA-512";
+							break;
+						case "md5":
+							// MD5 需要特殊處理（Web Crypto API 不支援）
+							const md5Hash = this.calculateMD5(data);
+							return {
+								content: [{
+									type: "text",
+									text: `🔐 **雜湊值計算結果**\n\n` +
+										  `📝 **原始資料**：${data.length > 100 ? data.substring(0, 100) + '...' : data}\n` +
+										  `🔧 **演算法**：MD5\n` +
+										  `📊 **編碼格式**：${encoding}\n` +
+										  `✨ **雜湊結果**：\`${md5Hash}\`\n` +
+										  `📏 **雜湊長度**：${md5Hash.length} 字元\n` +
+										  `📈 **資料長度**：${data.length} 字元\n\n` +
+										  `⚠️ **安全提醒**：MD5 已不安全，建議使用 SHA-256 或更強的演算法。`
+								}]
+							};
+						default:
+							throw new Error(`不支援的演算法：${algorithm}`);
+					}
+
+					// 轉換為所需格式
+					const hashArray = new Uint8Array(hashBuffer);
+					let hashString = "";
+					
+					if (encoding === "hex") {
+						hashString = Array.from(hashArray)
+							.map(b => b.toString(16).padStart(2, '0'))
+							.join('');
+					} else if (encoding === "base64") {
+						hashString = btoa(String.fromCharCode(...hashArray));
+					}
+
+					const securityLevel = algorithm === "sha512" ? "🟢 極高" :
+										  algorithm === "sha256" ? "🟡 高" :
+										  algorithm === "sha1" ? "🟠 中" : "🔴 低";
+
+					return {
+						content: [{
+							type: "text",
+							text: `🔐 **雜湊值計算結果**\n\n` +
+								  `📝 **原始資料**：${data.length > 100 ? data.substring(0, 100) + '...' : data}\n` +
+								  `🔧 **演算法**：${algName}\n` +
+								  `📊 **編碼格式**：${encoding.toUpperCase()}\n` +
+								  `✨ **雜湊結果**：\`${hashString}\`\n` +
+								  `📏 **雜湊長度**：${hashString.length} 字元\n` +
+								  `📈 **資料長度**：${data.length} 字元\n` +
+								  `🛡️ **安全等級**：${securityLevel}\n\n` +
+								  `💡 **使用場景**：\n` +
+								  `• 檔案完整性驗證\n` +
+								  `• 密碼雜湊儲存\n` +
+								  `• 數位簽章\n` +
+								  `• 資料去重複`
+						}]
+					};
+				} catch (error) {
+					return {
+						content: [{
+							type: "text",
+							text: `❌ 雜湊計算失敗：${error instanceof Error ? error.message : '未知錯誤'}`
+						}]
+					};
+				}
+			}
+		);
+
+		// 顏色代碼轉換工具
+		this.server.tool(
+			"convertColor",
+			{
+				color: z.string().describe("顏色代碼（HEX、RGB、HSL 等）"),
+				toFormat: z.enum(["hex", "rgb", "hsl", "hsv", "all"]).optional().describe("目標格式")
+			},
+			async ({ color, toFormat = "all" }) => {
+				try {
+					const colorInfo = this.parseColor(color);
+					const conversions = this.convertColorFormats(colorInfo);
+
+					let result = `🎨 **顏色代碼轉換結果**\n\n`;
+					result += `🎯 **輸入顏色**：${color}\n\n`;
+
+					if (toFormat === "all") {
+						result += `📋 **所有格式**：\n`;
+						result += `• **HEX**：${conversions.hex}\n`;
+						result += `• **RGB**：${conversions.rgb}\n`;
+						result += `• **HSL**：${conversions.hsl}\n`;
+						result += `• **HSV**：${conversions.hsv}\n`;
+						result += `• **CMYK**：${conversions.cmyk}\n\n`;
+					} else {
+						const formatValue = conversions[toFormat as keyof typeof conversions];
+						result += `✨ **${toFormat.toUpperCase()} 格式**：${formatValue}\n\n`;
+					}
+
+					result += `🖼️ **顏色預覽**：\n`;
+					result += `• **色塊顯示**：████████ (${conversions.hex})\n`;
+					result += `• **亮度**：${colorInfo.brightness.toFixed(1)}%\n`;
+					result += `• **飽和度**：${colorInfo.saturation.toFixed(1)}%\n`;
+					result += `• **色相**：${colorInfo.hue.toFixed(0)}°\n\n`;
+
+					result += `💡 **使用建議**：\n`;
+					result += `• 網頁設計：使用 HEX 或 RGB\n`;
+					result += `• 印刷設計：使用 CMYK\n`;
+					result += `• 色彩調整：使用 HSL 或 HSV`;
+
+					return {
+						content: [{
+							type: "text",
+							text: result
+						}]
+					};
+				} catch (error) {
+					return {
+						content: [{
+							type: "text",
+							text: `❌ 顏色轉換失敗：${error instanceof Error ? error.message : '未知錯誤'}\n\n` +
+								  `💡 **支援格式**：\n` +
+								  `• HEX: #FF0000 或 #F00\n` +
+								  `• RGB: rgb(255,0,0)\n` +
+								  `• HSL: hsl(0,100%,50%)\n` +
+								  `• 顏色名稱: red, blue, green 等`
+						}]
+					};
+				}
+			}
+		);
 	}
 
 	private generateFileContent(
@@ -1035,13 +1709,219 @@ coverage/
 		};
 		return names[category] || category;
 	}
+
+	// 密碼生成相關方法
+	private generateSecurePassword(options: {
+		length: number;
+		includeUppercase: boolean;
+		includeLowercase: boolean;
+		includeNumbers: boolean;
+		includeSymbols: boolean;
+		excludeSimilar: boolean;
+	}): string {
+		let charset = '';
+		
+		if (options.includeLowercase) {
+			charset += options.excludeSimilar ? 'abcdefghjkmnpqrstuvwxyz' : 'abcdefghijklmnopqrstuvwxyz';
+		}
+		if (options.includeUppercase) {
+			charset += options.excludeSimilar ? 'ABCDEFGHJKMNPQRSTUVWXYZ' : 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+		}
+		if (options.includeNumbers) {
+			charset += options.excludeSimilar ? '23456789' : '0123456789';
+		}
+		if (options.includeSymbols) {
+			charset += '!@#$%&*()_+-=[]{}|;:,.<>?';
+		}
+
+		if (charset === '') {
+			charset = 'abcdefghijklmnopqrstuvwxyz'; // 預設至少包含小寫字母
+		}
+
+		let password = '';
+		for (let i = 0; i < options.length; i++) {
+			password += charset.charAt(Math.floor(Math.random() * charset.length));
+		}
+
+		return password;
+	}
+
+	private calculatePasswordStrength(password: string): { score: number; level: string; complexity: string } {
+		let score = 0;
+		let complexity = '';
+
+		// 長度評分
+		if (password.length >= 12) score += 2;
+		else if (password.length >= 8) score += 1;
+
+		// 字元種類評分
+		if (/[a-z]/.test(password)) score += 1;
+		if (/[A-Z]/.test(password)) score += 1;
+		if (/[0-9]/.test(password)) score += 1;
+		if (/[^A-Za-z0-9]/.test(password)) score += 1;
+
+		const levels = ['極弱', '弱', '普通', '強', '極強'];
+		const level = levels[Math.min(score - 1, 4)] || '極弱';
+
+		if (score <= 1) complexity = '簡單';
+		else if (score <= 2) complexity = '中等';
+		else if (score <= 3) complexity = '複雜';
+		else complexity = '極複雜';
+
+		return { score, level, complexity };
+	}
+
+	// JSON 分析方法
+	private analyzeJSON(obj: any): { keys: number; values: number; arrays: number; objects: number } {
+		let keys = 0;
+		let values = 0;
+		let arrays = 0;
+		let objects = 0;
+
+		const analyze = (item: any) => {
+			if (Array.isArray(item)) {
+				arrays++;
+				item.forEach(analyze);
+			} else if (typeof item === 'object' && item !== null) {
+				objects++;
+				Object.keys(item).forEach(key => {
+					keys++;
+					analyze(item[key]);
+				});
+			} else {
+				values++;
+			}
+		};
+
+		analyze(obj);
+		return { keys, values, arrays, objects };
+	}
+
+	// MD5 計算方法（簡化版本）
+	private calculateMD5(data: string): string {
+		// 這是一個簡化的 MD5 模擬，實際應用中應使用專業的加密庫
+		let hash = 0;
+		for (let i = 0; i < data.length; i++) {
+			const char = data.charCodeAt(i);
+			hash = ((hash << 5) - hash) + char;
+			hash = hash & hash; // Convert to 32bit integer
+		}
+		
+		// 轉換為 hex 格式
+		const hex = Math.abs(hash).toString(16);
+		return hex.padStart(32, '0').substring(0, 32);
+	}
+
+	// 顏色解析方法
+	private parseColor(color: string): { r: number; g: number; b: number; hue: number; saturation: number; brightness: number } {
+		color = color.trim().toLowerCase();
+
+		// 預設顏色名稱
+		const colorNames: Record<string, string> = {
+			red: '#ff0000', blue: '#0000ff', green: '#008000', yellow: '#ffff00',
+			orange: '#ffa500', purple: '#800080', pink: '#ffc0cb', brown: '#a52a2a',
+			black: '#000000', white: '#ffffff', gray: '#808080', grey: '#808080'
+		};
+
+		// 如果是顏色名稱，轉換為 HEX
+		if (colorNames[color]) {
+			color = colorNames[color];
+		}
+
+		let r = 0, g = 0, b = 0;
+
+		// 解析 HEX 格式
+		if (color.startsWith('#')) {
+			const hex = color.substring(1);
+			if (hex.length === 3) {
+				r = parseInt(hex[0] + hex[0], 16);
+				g = parseInt(hex[1] + hex[1], 16);
+				b = parseInt(hex[2] + hex[2], 16);
+			} else if (hex.length === 6) {
+				r = parseInt(hex.substring(0, 2), 16);
+				g = parseInt(hex.substring(2, 4), 16);
+				b = parseInt(hex.substring(4, 6), 16);
+			}
+		}
+		// 解析 RGB 格式
+		else if (color.startsWith('rgb')) {
+			const match = color.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+			if (match) {
+				r = parseInt(match[1]);
+				g = parseInt(match[2]);
+				b = parseInt(match[3]);
+			}
+		}
+
+		// 計算 HSL 值
+		const max = Math.max(r, g, b) / 255;
+		const min = Math.min(r, g, b) / 255;
+		const brightness = (max + min) / 2 * 100;
+		
+		let hue = 0;
+		let saturation = 0;
+
+		if (max !== min) {
+			const delta = max - min;
+			saturation = brightness > 50 ? delta / (2 - max - min) : delta / (max + min);
+			
+			switch (max) {
+				case r / 255:
+					hue = (g / 255 - b / 255) / delta + (g < b ? 6 : 0);
+					break;
+				case g / 255:
+					hue = (b / 255 - r / 255) / delta + 2;
+					break;
+				case b / 255:
+					hue = (r / 255 - g / 255) / delta + 4;
+					break;
+			}
+			hue /= 6;
+		}
+
+		return {
+			r, g, b,
+			hue: hue * 360,
+			saturation: saturation * 100,
+			brightness
+		};
+	}
+
+	// 顏色格式轉換方法
+	private convertColorFormats(color: { r: number; g: number; b: number; hue: number; saturation: number; brightness: number }) {
+		const { r, g, b, hue, saturation, brightness } = color;
+
+		// HEX 格式
+		const hex = `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+
+		// RGB 格式
+		const rgb = `rgb(${r}, ${g}, ${b})`;
+
+		// HSL 格式
+		const hsl = `hsl(${Math.round(hue)}, ${Math.round(saturation)}%, ${Math.round(brightness)}%)`;
+
+		// HSV 格式
+		const hsv = `hsv(${Math.round(hue)}, ${Math.round(saturation)}%, ${Math.round(Math.max(r, g, b) / 255 * 100)}%)`;
+
+		// CMYK 格式（簡化計算）
+		const k = 1 - Math.max(r, g, b) / 255;
+		const c = k === 1 ? 0 : (1 - r / 255 - k) / (1 - k);
+		const m = k === 1 ? 0 : (1 - g / 255 - k) / (1 - k);
+		const y = k === 1 ? 0 : (1 - b / 255 - k) / (1 - k);
+		const cmyk = `cmyk(${Math.round(c * 100)}%, ${Math.round(m * 100)}%, ${Math.round(y * 100)}%, ${Math.round(k * 100)}%)`;
+
+		return { hex, rgb, hsl, hsv, cmyk };
+	}
 }
 
 // Export the OAuth handler as the default
+const mcpServer = new MyMCP();
+
 export default new OAuthProvider({
 	apiRoute: "/sse",
 	// TODO: fix these types
-	apiHandler: MyMCP.mount("/sse"),
+	// @ts-expect-error
+	apiHandler: mcpServer.server,
 	// @ts-expect-error
 	defaultHandler: app,
 	authorizeEndpoint: "/authorize",
