@@ -2,6 +2,7 @@ import app from "./app";
 import { McpAgent } from "agents/mcp";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+// @ts-ignore - This package doesn't have TypeScript declarations
 import OAuthProvider from "@cloudflare/workers-oauth-provider";
 
 export class MyMCP extends McpAgent {
@@ -101,9 +102,9 @@ export class MyMCP extends McpAgent {
 						};
 					}
 
-					const data = await response.json();
-					const current = data.current_condition[0];
-					const today = data.weather[0];
+				const data = await response.json() as any;
+				const current = data.current_condition[0];
+				const today = data.weather[0];
 					
 					const temp = units === "imperial" ? 
 						Math.round((parseFloat(current.temp_C) * 9/5) + 32) + "°F" :
@@ -216,8 +217,8 @@ export class MyMCP extends McpAgent {
 						};
 					}
 
-					const data = await response.json();
-					const coinData = data[symbol.toLowerCase()];
+				const data = await response.json() as any;
+				const coinData = data[symbol.toLowerCase()];
 					
 					if (!coinData) {
 						return {
@@ -1915,14 +1916,21 @@ coverage/
 }
 
 // Export the OAuth handler as the default
-const mcpServer = new MyMCP();
+// Create a handler that will forward MCP requests to the Durable Object
+const mcpHandler = {
+	async fetch(request: Request, env: Env): Promise<Response> {
+		// Get the Durable Object ID (we use a fixed ID for this demo)
+		const id = env.MCP_OBJECT.idFromName("mcp-server");
+		// Get the Durable Object stub
+		const stub = env.MCP_OBJECT.get(id);
+		// Forward the request to the Durable Object
+		return stub.fetch(request);
+	}
+};
 
 export default new OAuthProvider({
 	apiRoute: "/sse",
-	// TODO: fix these types
-	// @ts-expect-error
-	apiHandler: mcpServer.server,
-	// @ts-expect-error
+	apiHandler: mcpHandler,
 	defaultHandler: app,
 	authorizeEndpoint: "/authorize",
 	tokenEndpoint: "/token",
