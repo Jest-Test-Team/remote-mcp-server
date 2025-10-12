@@ -1,0 +1,11 @@
+{
+    "mcpServers": {
+      "remote-tools": {
+        "command": "npx",
+        "args": [
+          "mcp-remote",
+          "https://remote-mcp-server.pcleegood.workers.dev/sse"
+        ]
+      }
+    }
+  }
