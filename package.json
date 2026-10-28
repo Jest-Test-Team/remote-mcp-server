@@ -23,5 +23,8 @@
 		"typescript": "5.9.3",
 		"workers-mcp": "^0.0.13",
 		"wrangler": "^4.42.2"
+	},
+	"overrides": {
+		"proxy-addr": "^2.0.8"
 	}
 }
