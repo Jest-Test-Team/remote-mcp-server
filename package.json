@@ -29,6 +29,7 @@
 		"undici": "^7.30.1",
 		"markdown-it": "^14.3.3",
 		"js-yaml": "^4.3.2",
-		"body-parser": "^2.4.0"
+		"body-parser": "^2.4.0",
+		"lodash": "^4.18.0"
 	}
 }
