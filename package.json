@@ -34,6 +34,7 @@
 		"sharp": "^0.35.5",
 		"linkify-it": "^5.0.2",
 		"nanoid": "^5.1.16",
-		"path-to-regexp": "^8.4.0"
+		"path-to-regexp": "^8.4.0",
+		"picomatch": "^4.0.4"
 	}
 }
