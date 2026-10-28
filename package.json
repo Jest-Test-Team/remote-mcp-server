@@ -22,7 +22,7 @@
 		"marked": "^16.3.0",
 		"typescript": "5.9.3",
 		"workers-mcp": "^0.0.13",
-		"wrangler": "^4.42.2"
+		"wrangler": "^4.59.1"
 	},
 	"overrides": {
 		"proxy-addr": "^2.0.8",
