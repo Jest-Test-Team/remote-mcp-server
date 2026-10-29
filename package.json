@@ -13,15 +13,35 @@
 	},
 	"dependencies": {
 		"@cloudflare/workers-oauth-provider": "^0.0.11",
-		"@modelcontextprotocol/sdk": "1.19.1",
-		"agents": "^0.2.8",
-		"hono": "^4.9.9",
-		"zod": "^3.25.76"
+		"@modelcontextprotocol/sdk": "^1.32.0",
+		"agents": "^0.3.10",
+		"hono": "^4.13.7",
+		"zod": "^4.6.6"
 	},
 	"devDependencies": {
 		"marked": "^16.3.0",
 		"typescript": "5.9.3",
 		"workers-mcp": "^0.0.13",
-		"wrangler": "^4.42.2"
+		"wrangler": "^4.59.1"
+	},
+	"overrides": {
+		"proxy-addr": "^2.0.8",
+		"undici": "^7.30.1",
+		"markdown-it": "^14.3.3",
+		"js-yaml": "^4.3.2",
+		"body-parser": "^2.4.0",
+		"lodash": "^4.18.0",
+		"sharp": "^0.35.5",
+		"linkify-it": "^5.0.2",
+		"nanoid": "^5.1.16",
+		"path-to-regexp": "^8.4.0",
+		"picomatch": "^4.0.4",
+		"ws": "^8.21.0",
+		"defu": "^6.1.5",
+		"tmp": "^0.2.6",
+		"underscore": "^1.13.8",
+		"qs": "^6.16.1",
+		"ajv": "^6.14.0",
+		"@ai-sdk/provider-utils": "^3.0.28"
 	}
 }
